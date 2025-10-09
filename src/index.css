@@ -1,0 +1,60 @@
+/* src/index.css - add these rules for transitions and animations */
+
+/* page base */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f7f7f7;
+  color: #111;
+}
+
+/* gallery item hover: smooth scale */
+.gallery-item img {
+  transition: transform 280ms ease, filter 280ms ease;
+  will-change: transform;
+}
+.gallery-item:hover img {
+  transform: scale(1.04);
+  filter: saturate(1.05);
+}
+
+/* small shadow lift on hover */
+.gallery-item {
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+.gallery-item:hover {
+  box-shadow: 0 8px 22px rgba(0,0,0,0.12);
+  transform: translateY(-4px);
+}
+
+/* dimmed backdrop fade */
+.lightbox-backdrop,
+.contact-backdrop {
+  animation: fadeIn 220ms ease;
+  background: rgba(0,0,0,0.6);
+}
+
+/* lightbox content pop */
+.lightbox-content,
+.contact-content {
+  animation: popIn 220ms cubic-bezier(.2,.8,.2,1);
+  transform-origin: center;
+}
+
+/* keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* contact / lightbox inner styling (keeps look consistent) */
+.lightbox-content,
+.contact-content {
+  transition: transform 220ms ease, opacity 220ms ease;
+  border-radius: 10px;
+  overflow: hidden;
+}
