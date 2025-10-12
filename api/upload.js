@@ -1,42 +1,43 @@
-// Vercel Serverless Function (Node.js) to handle file upload to Vercel Blob Store.
+// Vercel Serverless Function (Node.js/Edge Runtime) to handle file upload to Vercel Blob Store.
 
 import { put } from '@vercel/blob';
 
-// Helper function to convert the incoming request body (readable stream) 
-// into a Buffer and extract the file data.
+// Helper function to extract the file data robustly.
 async function getFileFromRequest(request) {
   // Check for the presence of the required environment variable
-  // This is the most important check!
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     throw new Error('Server Configuration Error: The secret key is not correctly loaded.');
   }
 
-  // Use the standard Web API for handling form data
+  // Use the standard Web API method to get the file data from the request body.
   const formData = await request.formData();
+  
   // Get the file using the name 'file' (the name we gave it in the front-end)
   const file = formData.get('file');
 
   if (!file) {
-    throw new Error('No file part in the request. The front-end did not send the file correctly.');
+    throw new Error('No file part in the request.');
   }
 
-  // The 'file' object from formData is a File, which can be converted to a buffer
+  // Convert the file stream to a buffer for the Vercel Blob API
   const buffer = await file.arrayBuffer();
 
   return { 
     buffer: Buffer.from(buffer), 
     filename: file.name,
-    contentType: file.type
+    contentType: file.type || 'application/octet-stream' // Fallback content type
   };
 }
 
 
 // Main Serverless Function Export
-export default async function handler(request, response) {
+// This function must return a 'Response' object when using the Edge Runtime.
+export default async function handler(request) {
   if (request.method !== 'POST') {
-    // Only allow POST requests for uploading files
-    response.status(405).json({ error: 'Method Not Allowed' });
-    return;
+    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
+      status: 405,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   try {
@@ -49,11 +50,23 @@ export default async function handler(request, response) {
       addRandomSuffix: true, // Ensures unique filename
     });
 
-    // Successfully uploaded, send back the public URL
-    response.status(200).json({ url: blob.url });
+    // Successfully uploaded, send back the public URL as a Response object
+    return new Response(JSON.stringify({ url: blob.url }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
   } catch (error) {
     console.error('Blob upload failed:', error);
     // Send a 500 error response with the specific error message
-    response.status(500).json({ error: error.message || 'Internal Server Error during Blob processing.' });
+    return new Response(JSON.stringify({ error: error.message || 'Internal Server Error during Blob processing.' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
+
+// Configuration to force Vercel to use the Edge Runtime for improved file handling
+export const config = {
+  runtime: 'edge', 
+};
