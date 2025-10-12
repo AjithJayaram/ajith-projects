@@ -1,7 +1,8 @@
-// src/App.jsx
-import { useState } from "react";
+import { useState, useRef } from 'react';
+// The problematic import for image upload has been permanently removed.
 
-const gallery = [
+// Initial gallery data (now using a state variable in App)
+const initialGallery = [
   { id: 1, title: "Art 1", category: "Painting", src: "/images/art1.jpg" },
   { id: 2, title: "Art 2", category: "Drawing", src: "/images/art2.jpg" },
   { id: 3, title: "Art 3", category: "Digital", src: "/images/art3.jpg" },
@@ -12,8 +13,117 @@ const gallery = [
   { id: 8, title: "Art 8", category: "Study", src: "/images/art8.jpg" }
 ];
 
+// Helper component for the upload form
+const UploadForm = ({ onUploadSuccess }) => {
+  const inputFileRef = useRef(null);
+  const [message, setMessage] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+
+  // Function rewritten to use standard fetch and FormData
+  const handleUpload = async (event) => {
+    event.preventDefault();
+
+    const file = inputFileRef.current?.files[0];
+
+    if (!file) {
+      setMessage('Please select an image file first.');
+      return;
+    }
+
+    setIsUploading(true);
+    setMessage('Uploading file...');
+
+    try {
+      // 1. Use FormData to package the file for standard HTTP POST
+      const formData = new FormData();
+      // The key 'file' must match what the upload-proxy.js script expects
+      formData.append('file', file); 
+      formData.append('filename', file.name);
+
+      // 2. Post the FormData directly to our proxy endpoint
+      const response = await fetch('http://localhost:5173/api/upload', {
+        method: 'POST',
+        // IMPORTANT: Do NOT set Content-Type for FormData; the browser handles it.
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        // If the proxy returns an error, display it
+        throw new Error(result.error || 'Upload failed due to a server error.');
+      }
+      
+      // The result contains the final Vercel Blob URL (result.url)
+      const newBlobUrl = result.url; 
+
+      setMessage(`✅ Upload successful! ${file.name} is now in the gallery.`);
+      
+      // Reset the file input
+      inputFileRef.current.value = null;
+
+      // Add the new artwork to the gallery state
+      onUploadSuccess({
+        id: Date.now(),
+        title: file.name.split('.').slice(0, -1).join('.'),
+        category: "Uploaded",
+        src: newBlobUrl,
+      });
+
+    } catch (error) {
+      console.error(error);
+      setMessage(`❌ Upload failed: ${error.message || 'Check console for details.'}`);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: '15px', border: '1px solid #ddd', borderRadius: '8px', marginBottom: '20px', background: '#fff' }}>
+      <h3 style={{ margin: '0 0 10px 0', color: '#111' }}>Upload New Artwork</h3>
+      <form onSubmit={handleUpload} style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+        <input 
+          name="file" 
+          ref={inputFileRef} 
+          type="file" 
+          required 
+          accept="image/jpeg,image/png,image/webp"
+          disabled={isUploading}
+          style={{ flexGrow: 1, padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+        />
+        <button 
+          type="submit" 
+          disabled={isUploading}
+          style={{ 
+            padding: '8px 16px', 
+            backgroundColor: isUploading ? '#ccc' : '#007bff', // Use a friendly blue color
+            color: 'white', 
+            border: 'none', 
+            borderRadius: '4px', 
+            cursor: isUploading ? 'not-allowed' : 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          {isUploading ? 'Processing...' : 'Upload Image'}
+        </button>
+      </form>
+      {message && <p style={{ marginTop: '10px', fontSize: '14px', color: message.startsWith('❌') ? 'red' : '#007bff' }}>{message}</p>}
+    </div>
+  );
+};
+
+
+// Main App Component
 export default function App() {
+  // Use state for the gallery so we can add new items
+  const [gallery, setGallery] = useState(initialGallery);
   const [selected, setSelected] = useState(null);
+
+  // Function to update the gallery with a new uploaded piece
+  const handleNewUpload = (newArt) => {
+    // Add the new art to the beginning of the gallery list
+    setGallery(prevGallery => [newArt, ...prevGallery]);
+  };
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: 20, background: "#f7f7f7", minHeight: "100vh", maxWidth: "1200px", margin: "0 auto", width: "95%" }}>
@@ -42,26 +152,30 @@ export default function App() {
       </header>
 
       <main style={{ marginTop: 20 }}>
+        
+        {/* The functional Upload Form component is now added here */}
+        <UploadForm onUploadSuccess={handleNewUpload} />
+
         <h2>Gallery</h2>
-        <p style={{ color: "#666", marginTop: 0 }}>Click any image to view larger.</p>
+        <p style={{ color: "#666", marginTop: 0 }}>Click any image to view larger. Newly uploaded art appears at the top.</p>
 
         <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", marginTop: 12 }}>
           {gallery.map(item => (
            <button
-  key={item.id}
-  onClick={() => setSelected(item)}
-  className="gallery-item"
-  style={{ padding: 0, border: "none", background: "#fff", borderRadius: 8, overflow: "hidden", cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}
->
-  <div style={{ width: "100%", aspectRatio: "1 / 1", background: "#eee" }}>
-    <img src={item.src} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-  </div>
-  <div style={{ padding: 8 }}>
-    <div style={{ fontSize: 14, fontWeight: 600 }}>{item.title}</div>
-    <div style={{ fontSize: 12, color: "#666" }}>{item.category}</div>
-  </div>
-</button>
-
+             key={item.id}
+             onClick={() => setSelected(item)}
+             className="gallery-item"
+             style={{ padding: 0, border: "none", background: "#fff", borderRadius: 8, overflow: "hidden", cursor: "pointer", boxShadow: "0 1px 3px rgba(0,0,0,0.08)", transition: 'transform 0.2s' }}
+           >
+             <div style={{ width: "100%", aspectRatio: "1 / 1", background: "#eee" }}>
+               {/* This handles both the initial local images and the uploaded URLs */}
+               <img src={item.src} alt={item.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+             </div>
+             <div style={{ padding: 8 }}>
+               <div style={{ fontSize: 14, fontWeight: 600 }}>{item.title}</div>
+               <div style={{ fontSize: 12, color: "#666" }}>{item.category}</div>
+             </div>
+           </button>
           ))}
         </div>
       </main>
