@@ -1,4 +1,4 @@
-// Vercel Serverless Function (Node.js/Edge Runtime) to handle file upload to Vercel Blob Store.
+// Vercel Serverless Function (Edge Runtime) to handle file upload to Vercel Blob Store.
 
 import { put } from '@vercel/blob';
 
@@ -19,16 +19,15 @@ async function getFileFromRequest(request) {
     throw new Error('No file part in the request.');
   }
 
-  // Convert the file stream to a buffer for the Vercel Blob API
+  // Convert the file stream to an ArrayBuffer for the Vercel Blob API
   const buffer = await file.arrayBuffer();
 
   return { 
-    buffer: Buffer.from(buffer), 
+    buffer: buffer, // Use plain ArrayBuffer for Edge Runtime compatibility
     filename: file.name,
     contentType: file.type || 'application/octet-stream' // Fallback content type
   };
 }
-
 
 // Main Serverless Function Export
 // This function must return a 'Response' object when using the Edge Runtime.
